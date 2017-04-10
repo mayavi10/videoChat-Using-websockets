@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My project</title>
+</head>
+<body>
+<h1><i>"WEBRTC PEER TO PEER CONNECTION"</i></h1>
+<div><input type="text" id="firstuserid" value="firstuserid"  inputmode="" size=60 maxlength=120>
+    <input type="button" id="logon" value="logon" >
+</div>
+<div><input type="text" id="otheruserid" value="otheruserid"  inputmode="latin" size=60 maxlength=120 >
+    <input type="button" id="connectwith" value="connectwith" ></div>
+<script>
+    function hasusermedia() {
+        navigator.getUserMedia=navigator.getUserMedia ||navigator.webkitGetUserMedia ||navigator.mozGetUserMedia||navigator.msGetUserMedia;
+        return !!navigator.getUserMedia;
+    }
+    if(hasusermedia()) {
+        navigator.getUserMedia = navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+        navigator.getUserMedia({video: true, audio: true}, function (stream) {
+            var video = document.querySelector('video');
+            video.src = window.URL.createObjectURL(stream);
+        }, function (err) {
+        });
+    }else
+    {alert("ERROR.WebRTC  is not supported!");}
+
+</script>
+<div>
+
+    <tr>
+        <td><video id="myvid" autoplay></video></td>
+        <td><video id="seconduser" autoplay></video></td>
+    </tr>
+    <div><tr><td aling="center"><input type="button" id="sharemedia" value="sharemedia"></td>
+        <td aling="center"><input type="button" id="start tranfer" value="start tranfer"></td>
+         <td aling="center"><input type="button" id="close" value="close"></td>
+    </tr></div>
+    <table>
+        <tr>
+            <td><input type="button" id="sendData" value="sendData">
+            </td>
+            <td></td></tr>
+
+    </table>
+</div>
+<script>
+var soc;
+var datach;
+soc=new WebSocket("wss://localhost:9994");
+{
+    var regsbtn = document.getElementById("logon");
+    var connectwithbtn = document.getElementById("connectwith");
+    var firstuserid = document.getElementById("firstuserid");
+    var seconduserid= document.getElementById("seconduserid");
+    var starttranferbtn = document.getElementById("start tranfer");
+    var senddatabtn=document.getElementById("sendData");
+    var closebtn = document.getElementById("close");
+    closebtn.onclick = closeit;
+    var regst = 0;
+    var offer = " ";
+    var stream = 0;
+    var RTCPeerConnection = webkitRTCPeerConnection;
+    var server = null;
+    var PeerConnection = new RTCPeerConnection(server);
+    datach = PeerConnection.createDataChannel("Sender", null);
+}
+
+{
+    datach.onopen = datachannelopen;
+    connectwithbtn.disable = true;
+    regsbtn.onclick = registration;
+    starttranferbtn.onclick = startPeer;
+    soc.onmessage = recieveReply;
+    PeerConnection.onicecandidate = gotIcecandidate;
+    PeerConnection.onaddstream = gotStream;
+    PeerConnection.ondatachannel = ondataChannelExe;
+}
+senddatabtn.onclick=function() {
+    var msg = prompt("enter message");
+    var kk = {sender: firstuserid.value, message: msg};
+    var chunk = JSON.stringify(kk);
+    console.log("message sent" + kk);
+    datach.send(chunk);}
+    function ondataChannelExe(event) {
+        console.log("event");
+        event.channel.onmessage = message;}
+    function message(event) {
+        console.log("data" + event.data);
+    }
+
+    function datachannelopen() {
+        console.log("creating data channel");
+
+    }function  recieveReply(event) {
+        console.log("reply from server", event.data);
+        var g = JSON.parse(event.data);
+        console.log(g);
+        if (g.type == "login") {
+            if (g.executed == "Success") {
+                useridbtn.disable = true;
+                regsbtn.disable = true;
+                regst = 1;
+            }
+            else {
+                alert("username taken");
+            }
+        }
+        if (g.type == "offer") {
+            PeerConnection.setRemoteDescription(g.descrip);
+            offer = data.sender;
+            console.log("answer sending");
+            PeerConnection.createans(answeroffer, signallingerror);
+        }
+        if (g.type == "answer") {
+            PeerConnection.setRemoteDescription(data.desc);
+            console.log(PeerConnection);
+        }
+        if (g.type == "candidate"){
+            PeerConnection.addIceCnadidate(new RTCIcecandidate(data.candy));}
+        if (g.type == "leave"){
+            console.log("leaving from connection");}
+        if (g.type == "error"){
+            console.log("error occured");}
+    }
+
+function send(msg,soc) {
+    if(soc.readyState ===1)  soc.send(JSON.stringify(msg));
+else alert("Connection Lost ");
+}
+function registration() {
+    var d={type:"register",username:firstuserid.value};
+    send(d,soc);}
+function datachannelopen(){
+    console.log("Creating a data channel");}
+function startPeer()
+{
+
+PeerConnection.onaddstream(stream);
+    console.log("stream added");
+    PeerConnection.createOffer(startdescription,signallingerror);
+}
+function startdescription(des)
+{
+    PeerConnection.setLocalDescription(des);
+   var ss={type:"offer", sender:firstuserid.value,receiver:seconduserid.value,desdata:des};
+   console.log("description is ", ss);
+   send(ss,soc);
+         }
+function signallingerror(e)
+{
+console.log("error occiurred"+e);}
+function ansoff(description) {
+    var l={type:"answer",replyfor:offerfrom,ansdes:description};
+    send(l,soc);
+    console.log(PeerConnection);
+}
+function gotStream(event)
+{
+    console.log("stream added");
+    document.getElementById(seconduser).src=window.URL.createObjectURL(event.stream);
+}
+function gotIcecandidate(event)
+{
+    var m={type:"candidate",candy:event.candidate,target:seconduserid.value};
+     send(m,soc);
+console.log("-----"+ m);
+}
+function closeit() {
+ if(soc.readyState==1){
+     soc.close();
+    closebtn.value("reconnect");
+}
+else
+ {
+     soc=new WebSocket("wss://localhost:9994");
+     registerbtn.disabled=false;
+     firstuserid.disabled=false;
+     seconduserid.disabled=false;
+     regst=0;
+     closebtn.value="Disconnect";}
+}
+</script>
+</body>
+</html>

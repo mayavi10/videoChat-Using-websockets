@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>V-LAN</title>
+    <link rel="stylesheet" href="styleSheet.css">
+
+</head>
+<body>
+hii
+
+<div><input type="text" id="userId" value="Your username">
+    <input type="button" id="register" value="register">
+
+</div>
+<div>
+    <input type="text" id="partnerId" value="Friend usrename">
+    <input type="button" id="connect" value="PairWithHIm">
+</div>
+<div >
+    <h1 align ="center">Start Streaming Media  </h1>
+
+    <table>
+        <tr>
+            <td><video id="Myvideo" autoplay></video>
+            </td>
+            <td><video id="hisvideo" autoplay></video>
+            </td>
+
+        </tr>
+        <div><tr><td aling="center"><input type="button" id="startVideo" value="StartMedia"> </td>
+
+            <td  aling="center"><input type="button" id="transmit" value="Strat Transmission">
+                <input type="button" id="cls" value="closeCeonnction"></td>
+        </tr>
+        </div>
+
+
+    </table>
+    <table>
+        <tr>
+            <td><input type="button" id="chatsend" value="sendData">
+            </td>
+            <td>
+            </td></tr>
+    </table>
+</div>
+<script >
+    var socket;
+    var datachannel;
+    socket=new WebSocket("wss://localhost:9994");//lan:.....>>>>>"wss://192.168.117.25:9991
+    {  var registerbtn=document.getElementById("register");
+        var userID=document.getElementById("userId");
+        var connectbtn=document.getElementById("connect");
+        var videobtn=document.getElementById("startVideo");
+        var datasend=document.getElementById("chatsend");
+        var closebtn=document.getElementById("cls");
+        closebtn.onclick=closeit;
+        var transmitbtn=document.getElementById("transmit");
+        var partnerID=document.getElementById("partnerId");
+        var registerStatus=0;
+        var pairingStatus=0;
+        var connectionStatus=0;
+        var offerfrom="";
+        var stream=0;
+        var RTCPeerConnection=webkitRTCPeerConnection;
+        var servers=null;
+        var PeerConnection=new RTCPeerConnection(servers);
+        var pairid=null;
+        datachannel=PeerConnection.createDataChannel("Sender",null);
+    }
+    {   datachannel.onopen=datachannelopen;
+        connectbtn.disabled = true;
+        registerbtn.onclick = registration;
+        connectbtn.onclick = getPaired;
+        socket.onmessage = recieveReply;
+        videobtn.onclick = getVideo;
+        transmitbtn.onclick = StartPeer;
+        PeerConnection.onicecandidate = gotIcecandidate;
+        PeerConnection.onaddstream = gotStream;
+        PeerConnection.ondatachannel=ondataChannelExe;
+    }
+    datasend.onclick=function(){
+        var t=prompt("Msg to send");
+        var so={sender:userID.value,message:t};
+        var chunk=JSON.stringify(so)
+        console.log("sent data="+so);datachannel.send(chunk);}
+    function ondataChannelExe(event){
+        console.log("Kuch ho raha hai");
+        event.channel.onmessage=messageincoming;
+    }
+    function messageincoming(event){
+        console.log("this is data :  "+event.data);}
+
+    function datachannelopen(){
+        console.log("Creating a data channel");}
+    function recieveReply(event){
+        console.log("Server sent Reply",event.data);
+        var data=JSON.parse(event.data);
+        console.log(data);
+        if(data.type==="register") {
+            if (data.executed === "Success") {
+                registerStatus = 1;
+                userID.disabled = true;
+                registerbtn.disabled = true;
+                connectbtn.disabled= false;
+            }
+            else {
+                alert("Please select a different username");
+            }
+
+        }
+        if(data.type==="pairing"){
+            pairid=data.user;
+            pairingStatus=1;
+            partnerID.value=pairid;
+            alert("Remote User is ",pairid);
+
+            partnerID.disabled=true;
+            console.log("Paierd",pairid,"Pairing status",pairingStatus);
+
+
+
+
+        }
+        if(data.type === "offer"){//alert("Getting a connection from"+data.sender);
+            PeerConnection.setRemoteDescription(data.descrip);
+            offerfrom=data.sender;
+            alert("answer will be sent to "+offerfrom);
+            console.log("Got an answer sending now*******");
+            PeerConnection.createAnswer(answeroffer,signallingerror);
+
+
+        }
+        if(data.type==="answer"){alert("got a reply  from the userat remote");
+            PeerConnection.setRemoteDescription(data.desc);
+
+            //  console.log(data.ansdes);
+            console.log(PeerConnection);
+
+        }
+        if(data.type==="ice"){
+            PeerConnection.addIceCandidate(new RTCIceCandidate(data.candy));
+            // alert("Got an IceCAndidate");
+        }
+
+
+    }
+    function registration(){
+
+        var data2send={type:"register",username:userID.value};
+        send(data2send,socket);
+
+    };
+    function getPaired(){
+        var otheruser=partnerID.value;
+        var rootuser=userID.value;
+        var sendPacket={type:"pairing",rootUser:rootuser,otheruser:otheruser,pairstatus:pairid};
+
+        send(sendPacket,socket);
+    }
+    function getVideo(){
+        var params={audio:true,video:true};
+        if(pairingStatus===1) {
+            navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+            navigator.getUserMedia(params, function (s) {
+                document.getElementById("Myvideo").src = window.URL.createObjectURL(s);
+                document.getElementById("Myvideo").muted=true;
+                console.log("VideoFeed Started");
+                stream = s;
+            }, function (e) {
+                console.log("Error in aceesing camera", e);
+            });
+        }else alert("Please Pair with Other User");
+    }
+    function send(msg,sock){
+        if(sock.readyState ===1)  sock.send(JSON.stringify(msg));
+        else alert("Connection Lost please Press reconnect Button");
+    }
+    function StartPeer() {
+        if(pairingStatus===1){
+            PeerConnection.addStream(stream);
+            console.log("Stream added to peer");
+            console.log("********************************");
+            PeerConnection.createOffer(startdescription,signallingerror);
+        }else alert("please pair up first");
+
+    }
+    function startdescription(description){
+        console.log("Local Peer Descript startd");
+        PeerConnection.setLocalDescription(description);
+        var sendpack={type:"offer",sender:userID.value,reciever:partnerID.value,desdata:description};
+        console.log("This is the description for other peer",sendpack);
+        send(sendpack,socket);
+    }
+    function signallingerror(r){
+        console.log("xxxxxxxx XXXXX Error occure XXXX xxxxxxxx");
+        console.log(r);}
+    function answeroffer(description){
+        PeerConnection.setLocalDescription(description);
+        var offerreply={type:"answer",replyfor:offerfrom,ansdes:description};
+        send(offerreply,socket);
+        console.log(PeerConnection);
+    }
+    function gotStream(event){
+        console.log("Adding remote Stream");
+        document.getElementById("hisvideo").src=window.URL.createObjectURL(event.stream);
+
+    }
+    function gotIcecandidate(event){
+
+        if(event.candidate){
+            var icereply={type:"ice",candy:event.candidate,target:partnerID.value};
+            console.log("************");
+            console.log(icereply);
+            send(icereply,socket);
+            console.log("************");
+
+        }
+
+    }
+    window.onbeforeunload = function () {
+        alert("Do you really want to close?");
+    };
+    function closeit(){
+
+
+        if(socket.readyState===1) {socket.close();
+            closebtn.value="reconnect";
+
+
+        }
+        else{
+            socket=new WebSocket("wss://192.168.43.137:9991");
+            registerbtn.disabled=false;
+            userID.disabled=false;
+            partnerID.disabled=false;
+            pairingStatus=0;
+            registerStatus=0;
+            closebtn.value="Disconnect";}
+    }
+</script>
+hey
+</body>
+</html>
